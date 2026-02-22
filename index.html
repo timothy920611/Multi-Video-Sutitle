@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JW 字幕提取器 (多連結批次版)</title>
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Markdown Renderer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- App Icon -->
+    <link rel="apple-touch-icon" href="https://assetsnffrgf-a.akamaihd.net/assets/m/802013146/univ/art/802013146_univ_sqr_xl.jpg">
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        
+        /* Custom Scrollbar */
+        textarea::-webkit-scrollbar, div::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track, div::-webkit-scrollbar-track { background: transparent; }
+        textarea::-webkit-scrollbar-thumb, div::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+        textarea::-webkit-scrollbar-thumb:hover, div::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: content-box; }
+        
+        /* Markdown Styles */
+        .prose h2 { font-size: 1.2em; font-weight: bold; margin-bottom: 0.5em; color: #6b21a8; }
+        .prose h3 { font-size: 1.1em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: #0f172a; }
+        .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .prose li { margin-bottom: 0.3em; }
+        .prose p { margin-bottom: 0.8em; line-height: 1.6; }
+        .prose strong { color: #047857; font-weight: 700; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        
+        .progress-bar-striped {
+            background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+        }
+        @keyframes progress-stripes { from { background-position: 1rem 0; } to { background-position: 0 0; } }
+        .animate-stripes { animation: progress-stripes 1s linear infinite; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans h-screen w-screen overflow-hidden flex flex-col">
+    <div id="root" class="h-full w-full flex flex-col"></div>
+
+    <script type="text/babel">
+        // -----------------------------------------------------------------
+        //  🔐 管理員專區：請在此設定 API KEY
+        // -----------------------------------------------------------------
+        const ENCODED_KEYS = [
+            "QUl6YVN5QlROTXozQzBKVGZncUZsMmdYMXhEcUtjNmk1b2tVX19J",
+            "QUl6YVN5Q3J5LVFHZ2VjMWVHWDJ5SVdMQjRXbklhRHRCdzJLS0pn",
+            // 如果您覺得編碼太麻煩，直接貼明文也可以 (記得保留雙引號)
+            "QUl6YVN5QzM2MzN0YmtOdFc0dUk4VWJvRXI0LXJHWXp0MHJmZkQ0"
+        ];
+        // -----------------------------------------------------------------
+
+        const Icons = {
+            ShieldCheck: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>,
+            Loader2: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+            Play: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="6 3 20 12 6 21 6 3"/></svg>,
+            AlertTriangle: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+            FileText: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>,
+            Check: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="20 6 9 17 4 12"/></svg>,
+            CheckCircle: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+            XCircle: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
+            Clipboard: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>,
+            Sparkles: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 9h4"/></svg>,
+            Brain: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
+            Lightbulb: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Globe: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>,
+            ArrowLeft: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+            List: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        };
+
+        const PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest=',
+            'https://thingproxy.freeboard.io/fetch/' 
+        ];
+
+        const App = () => {
+            // UI State
+            const [appState, setAppState] = React.useState('input'); // 'input' | 'processing' | 'result'
+            
+            // Input State
+            const [inputText, setInputText] = React.useState('');
+            
+            // Processing State
+            const [results, setResults] = React.useState([]); // { url, id, title, text, status: 'pending'|'success'|'error', errorMsg }
+            const [progress, setProgress] = React.useState({ current: 0, total: 0, success: 0, failed: 0 });
+            
+            // Result State
+            const [copyState, setCopyState] = React.useState(false);
+            const [aiStatus, setAiStatus] = React.useState('idle'); 
+            const [aiResult, setAiResult] = React.useState('');
+
+            const decodeKey = (str) => {
+                try { return str.startsWith('AIza') ? str : atob(str); } 
+                catch (e) { return str; }
+            };
+
+            const parseUrlInfo = (inputUrl) => {
+                try {
+                    const info = { id: null, lang: 'CH' };
+                    const u = new URL(inputUrl.startsWith('http') ? inputUrl : `https://${inputUrl}`);
+                    if (u.searchParams.get('lank')) info.id = u.searchParams.get('lank');
+                    if (u.searchParams.get('wtlocale')) info.lang = u.searchParams.get('wtlocale');
+                    if (!info.id) {
+                        const match = inputUrl.match(/(pub-[a-zA-Z0-9-_]+)/i);
+                        if (match) info.id = match[1];
+                    }
+                    return info;
+                } catch (e) {
+                    return { id: null, lang: 'CH' };
+                }
+            };
+
+            const cleanVttText = (vttContent) => {
+                if (!vttContent) return '';
+                const txt = document.createElement("textarea");
+                const decode = (str) => { txt.innerHTML = str; return txt.value; };
+                const lines = vttContent.split('\n');
+                let resultLines = [];
+                let currentTimestamp = '';
+                
+                for (let i = 0; i < lines.length; i++) {
+                    let text = lines[i].trim();
+                    if (!text) continue;
+                    if (text.startsWith('WEBVTT') || text.startsWith('NOTE') || text.startsWith('STYLE')) continue;
+                    if (/^\d+$/.test(text)) continue; 
+                    if (text.includes('-->')) {
+                        const timeMatch = text.match(/^(\d{2}:\d{2}:\d{2})/);
+                        if (timeMatch) currentTimestamp = `[${timeMatch[1]}] `;
+                        else currentTimestamp = '';
+                        continue;
+                    }
+                    text = text.replace(/<\/?[^>]+(>|$)/g, "");
+                    text = decode(text); 
+                    resultLines.push(`${currentTimestamp}${text}`);
+                }
+                return resultLines.join('\n');
+            };
+
+            const fetchWithRetry = async (targetUrl) => {
+                try {
+                    const directRes = await fetch(targetUrl);
+                    if (directRes.ok) return directRes;
+                } catch (e) {}
+
+                for (let proxy of PROXIES) {
+                    try {
+                        const res = await fetch(proxy + encodeURIComponent(targetUrl));
+                        if (res.ok) return res;
+                    } catch (e) { continue; }
+                }
+                throw new Error('無法連線至伺服器');
+            };
+
+            const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+            const handleStartBatch = async () => {
+                const lines = inputText.split('\n').map(l => l.trim()).filter(l => l !== '');
+                if (lines.length === 0) return;
+                
+                // 限制最多 50 個
+                const urlsToProcess = lines.slice(0, 50);
+                if (lines.length > 50) {
+                    alert('已自動截斷至前 50 個網址。');
+                }
+
+                // Initialize state
+                const initialResults = urlsToProcess.map(url => ({ url, status: 'pending', id: parseUrlInfo(url).id || '未知ID' }));
+                setResults(initialResults);
+                setProgress({ current: 0, total: urlsToProcess.length, success: 0, failed: 0 });
+                setAppState('processing');
+                setAiStatus('idle');
+                setAiResult('');
+
+                // 批次處理迴圈 (依序處理避免被封鎖)
+                let currentResults = [...initialResults];
+                let successCount = 0;
+                let failedCount = 0;
+
+                for (let i = 0; i < urlsToProcess.length; i++) {
+                    const url = urlsToProcess[i];
+                    let itemResult = { ...currentResults[i] };
+
+                    try {
+                        const { id, lang } = parseUrlInfo(url);
+                        if (!id) throw new Error('無法識別影片 ID，請檢查網址');
+                        itemResult.id = id;
+
+                        // 1. Fetch JSON
+                        const apiUrl = `https://b.jw-cdn.org/apis/mediator/v1/media-items/${lang}/${id}?clientType=www`;
+                        const resJSON = await fetchWithRetry(apiUrl);
+                        const data = await resJSON.json();
+                        
+                        const files = data.media?.[0]?.files || [];
+                        itemResult.title = data.media?.[0]?.title || id;
+                        
+                        const subFile = files.find(f => f.label === 'subtitles' || f.subtitles?.url);
+                        if (!subFile) throw new Error('此影片無字幕檔');
+
+                        // 2. Fetch VTT
+                        const vttUrl = subFile.subtitles?.url || subFile.url;
+                        const resVTT = await fetchWithRetry(vttUrl);
+                        const vttText = await resVTT.text();
+
+                        // 3. Clean and Save
+                        itemResult.text = cleanVttText(vttText);
+                        itemResult.status = 'success';
+                        successCount++;
+
+                    } catch (err) {
+                        itemResult.status = 'error';
+                        itemResult.errorMsg = err.message;
+                        failedCount++;
+                    }
+
+                    currentResults[i] = itemResult;
+                    setResults([...currentResults]);
+                    setProgress({ current: i + 1, total: urlsToProcess.length, success: successCount, failed: failedCount });
+                    
+                    // 暫停 300ms 避免請求過於密集
+                    if (i < urlsToProcess.length - 1) await delay(300);
+                }
+
+                // 處理完成
+                setAppState('result');
+            };
+
+            const resetApp = () => {
+                setAppState('input');
+                setInputText('');
+            };
+
+            // 產生合併後的完整文字
+            const getCombinedText = () => {
+                const successfulItems = results.filter(r => r.status === 'success');
+                if (successfulItems.length === 0) return '沒有成功提取任何影片的字幕。';
+
+                return successfulItems.map((item, index) => {
+                    return `=========================================\n影片 ${index + 1}: ${item.title || item.id}\n=========================================\n\n${item.text}\n\n`;
+                }).join('');
+            };
+
+            const copyResult = () => {
+                const text = getCombinedText();
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                setCopyState(true);
+                setTimeout(() => setCopyState(false), 2000);
+            };
+
+            const downloadTxt = () => {
+                let content = `JW 字幕批次提取結果 (${results.filter(r=>r.status==='success').length} 部影片)\n\n`;
+                
+                if (aiStatus === 'success' && aiResult) {
+                    content += `========== ✨ AI 綜合分析 ==========\n\n`;
+                    content += `${aiResult}\n\n`;
+                    content += `=================================\n\n`;
+                }
+                
+                content += getCombinedText();
+
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `JW字幕_批次提取_${new Date().toISOString().slice(0,10)}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+
+            const downloadHtml = () => {
+                const successfulItems = results.filter(r => r.status === 'success');
+                if (successfulItems.length === 0) return;
+
+                let aiSectionHtml = '';
+                if (aiStatus === 'success' && aiResult) {
+                    aiSectionHtml = `
+                        <div class="ai-box">
+                            <div class="ai-title">✨ AI 綜合分析報告</div>
+                            <div class="ai-content">${marked.parse(aiResult)}</div>
+                        </div>
+                    `;
+                }
+
+                let tocHtml = `<div class="toc-box"><h3>影片目錄 (${successfulItems.length})</h3><ul>`;
+                successfulItems.forEach((item, idx) => {
+                    tocHtml += `<li><a href="#video-${idx}">影片 ${idx+1}: ${item.title}</a></li>`;
+                });
+                tocHtml += `</ul></div>`;
+
+                let transcriptsHtml = '';
+                successfulItems.forEach((item, idx) => {
+                    const safeTranscript = item.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    transcriptsHtml += `
+                        <div class="video-section" id="video-${idx}">
+                            <h2>影片 ${idx+1}: ${item.title}</h2>
+                            <div class="transcript">${safeTranscript}</div>
+                        </div>
+                    `;
+                });
+
+                const htmlContent = `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JW 字幕批次提取報告</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.8; color: #334155; background-color: #f1f5f9; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h1 { color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-top: 0; font-size: 28px; }
+        .ai-box { background-color: #faf5ff; border: 1px solid #e9d5ff; padding: 24px; border-radius: 12px; margin-bottom: 32px; }
+        .ai-title { color: #7e22ce; font-size: 18px; font-weight: bold; margin-bottom: 12px; }
+        .ai-content { font-size: 15px; color: #475569; }
+        .ai-content h2, .ai-content h3 { font-weight: bold; color: #6b21a8; margin-top: 1em; margin-bottom: 0.5em; }
+        .ai-content ul { padding-left: 1.5em; margin-bottom: 1em; }
+        .toc-box { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 32px; }
+        .toc-box h3 { margin-top: 0; color: #0f172a; font-size: 16px; margin-bottom: 12px; }
+        .toc-box ul { list-style: none; padding: 0; margin: 0; }
+        .toc-box li { margin-bottom: 8px; }
+        .toc-box a { color: #2563eb; text-decoration: none; font-size: 14px; }
+        .toc-box a:hover { text-decoration: underline; }
+        .video-section { margin-top: 40px; padding-top: 20px; border-top: 2px dashed #cbd5e1; }
+        .video-section h2 { font-size: 20px; color: #0f172a; margin-bottom: 16px; }
+        .transcript { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; white-space: pre-wrap; color: #1e293b; background: #f8fafc; padding: 20px; border-radius: 8px; }
+        @media (max-width: 600px) { body { padding: 10px; } .container { padding: 20px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JW 字幕批次提取報告</h1>
+        ${aiSectionHtml}
+        ${tocHtml}
+        ${transcriptsHtml}
+    </div>
+</body>
+</html>`;
+
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                const downloadUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `JW字幕_批次提取_${new Date().toISOString().slice(0,10)}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+            };
+
+            const callGemini = async (type) => {
+                if (ENCODED_KEYS.length === 0 || ENCODED_KEYS[0] === "YOUR_API_KEY_HERE") {
+                    setAiStatus('error');
+                    setAiResult('請通知管理員設定 API Key');
+                    return;
+                }
+
+                const rawKey = ENCODED_KEYS[Math.floor(Math.random() * ENCODED_KEYS.length)];
+                const selectedKey = decodeKey(rawKey);
+                
+                const fullText = getCombinedText();
+                if (!fullText || fullText.length < 50) return;
+
+                setAiStatus('loading');
+                setAiResult('');
+
+                // Gemini 2.5 Flash token 容量很大，但還是稍微截斷保護
+                const context = fullText.substring(0, 80000); 
+
+                let prompt = "";
+                if (type === 'summary') {
+                    prompt = `為以下這段影片的字幕內容提供一份繁體中文的「大綱」，包括：引言、主要論點、主要論點下的次要論點、使用的經文、如果可以幫我在論點下列出有使用到的耶和華見證人出版物名稱，沒有就不需要。\n\n要求：\n1. 使用 Markdown 格式。\n2. 只需列出論點、經文、來源，其他不用。\n3. 用字體大小區分主要論點、次要論點、經文，主要論點字體最大，次要論點字體第二大，其他內容就是一般內文字體。\n\n內容：\n${context}`;
+                } else if (type === 'quiz') {
+                    prompt = `如果影片有提供比喻，幫我完整截取出來，如果沒有就告訴我沒有找到。\n\n要求：\n1. 截取完整比喻片段。\n2. 條列式。\n3. 使用繁體中文 Markdown 格式。\n\n內容：\n${context}`;
+                } else if (type === 'action') {
+                    prompt = `如果字幕內容有鼓勵聽者採取行動，請幫我列出來。\n\n要求：\n1. 條列式。\n2. 具體且可執行。\n3. 使用繁體中文 Markdown 格式。\n\n內容：\n${context}`;
+                }
+
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${selectedKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    });
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+                    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (aiText) {
+                        setAiResult(aiText);
+                        setAiStatus('success');
+                    } else throw new Error('No content generated');
+                } catch (e) {
+                    setAiStatus('error');
+                    setAiResult(`AI 分析失敗 (${e.message})。`);
+                }
+            };
+
+            // ================== RENDERERS ==================
+
+            const renderInputScreen = () => (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in">
+                    <div className="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
+                        <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                            <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><Icons.List /></div>
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-800">批次影片輸入</h2>
+                                <p className="text-sm text-slate-500">請貼上影片網址，每行一個 (最多 50 個)</p>
+                            </div>
+                        </div>
+                        <textarea
+                            className="w-full h-64 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none font-mono text-sm whitespace-pre"
+                            placeholder="https://...\nhttps://...\nhttps://..."
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                        />
+                        <button
+                            onClick={handleStartBatch}
+                            disabled={!inputText.trim()}
+                            className="mt-6 w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed shadow-lg shadow-emerald-200"
+                        >
+                            <Icons.Play className="w-5 h-5 fill-current" />
+                            開始批次提取
+                        </button>
+                    </div>
+                </div>
+            );
+
+            const renderProcessingScreen = () => {
+                const percent = progress.total === 0 ? 0 : Math.round((progress.current / progress.total) * 100);
+                return (
+                    <div className="flex-1 flex flex-col items-center p-6 animate-fade-in bg-slate-50">
+                        <div className="w-full max-w-3xl bg-white p-8 rounded-2xl shadow-md border border-slate-100 mb-6">
+                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 mb-6">
+                                <Icons.Loader2 className="animate-spin text-emerald-500" />
+                                正在批次處理中... {percent}%
+                            </h2>
+                            
+                            <div className="w-full bg-slate-100 rounded-full h-4 mb-2 overflow-hidden">
+                                <div className="bg-emerald-500 h-4 rounded-full transition-all duration-300 progress-bar-striped animate-stripes" style={{ width: `${percent}%` }}></div>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-500 font-medium px-1">
+                                <span>已處理: {progress.current} / {progress.total}</span>
+                                <div className="flex gap-4">
+                                    <span className="text-emerald-600">成功: {progress.success}</span>
+                                    <span className="text-rose-500">失敗: {progress.failed}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* List of URLs being processed */}
+                        <div className="w-full max-w-3xl flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div className="bg-slate-100 px-4 py-3 font-bold text-sm text-slate-600 border-b border-slate-200">處理清單</div>
+                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                {results.map((res, i) => (
+                                    <div key={i} className={`p-3 rounded-lg border flex items-center gap-3 text-sm
+                                        ${res.status === 'pending' ? 'bg-slate-50 border-slate-100 text-slate-400' : ''}
+                                        ${res.status === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : ''}
+                                        ${res.status === 'error' ? 'bg-rose-50 border-rose-100 text-rose-800' : ''}
+                                    `}>
+                                        <div className="shrink-0">
+                                            {res.status === 'pending' && <Icons.Loader2 className="w-5 h-5 animate-spin" />}
+                                            {res.status === 'success' && <Icons.CheckCircle className="w-5 h-5" />}
+                                            {res.status === 'error' && <Icons.XCircle className="w-5 h-5" />}
+                                        </div>
+                                        <div className="flex-1 truncate font-mono">
+                                            {res.title || res.url}
+                                            {res.status === 'error' && <div className="text-xs text-rose-500 mt-0.5">{res.errorMsg}</div>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderResultScreen = () => {
+                const combinedText = getCombinedText();
+                
+                return (
+                    <div className="flex-1 flex flex-col h-full overflow-hidden bg-white animate-fade-in relative min-h-0">
+                        
+                        {/* Toolbar */}
+                        <div className="bg-slate-50 p-3 border-b border-slate-200 flex flex-wrap gap-2 items-center shrink-0 z-10 shadow-sm px-4">
+                            <button onClick={resetApp} className="mr-2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg text-sm font-bold transition-colors">
+                                <Icons.ArrowLeft className="w-4 h-4"/> 返回重新輸入
+                            </button>
+                            <div className="h-6 w-px bg-slate-300 mx-1"></div>
+
+                            <div className="px-2 flex items-center gap-2 text-slate-700 font-bold text-sm">
+                                <Icons.Sparkles className="text-purple-500 w-5 h-5" />
+                                AI 綜合分析
+                            </div>
+                            <button onClick={() => callGemini('summary')} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-sm font-medium transition-colors">
+                            <Icons.FileText className="w-4 h-4"/> 大綱
+                            </button>
+                            <button onClick={() => callGemini('quiz')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors">
+                            <Icons.Brain className="w-4 h-4"/> 比喻
+                            </button>
+                            <button onClick={() => callGemini('action')} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-medium transition-colors">
+                            <Icons.Lightbulb className="w-4 h-4"/> 行動
+                            </button>
+                            
+                            <div className="ml-auto text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                                成功提取: {results.filter(r=>r.status==='success').length} 部
+                            </div>
+                        </div>
+
+                        {/* AI Overlay */}
+                        {aiStatus !== 'idle' && (
+                            <div className="bg-white border-b border-purple-100 p-4 shadow-sm shrink-0 max-h-[40vh] overflow-y-auto relative z-20">
+                                <button onClick={() => setAiStatus('idle')} className="absolute top-2 right-2 text-slate-400 hover:text-slate-600 p-2"><Icons.X /></button>
+                                
+                                {aiStatus === 'loading' && (
+                                    <div className="flex items-center justify-center py-4 text-purple-600 gap-3">
+                                        <Icons.Loader2 className="animate-spin w-5 h-5" />
+                                        <p className="text-sm font-medium">Gemini 正在閱讀所有影片內容...</p>
+                                    </div>
+                                )}
+                                {aiStatus === 'error' && <div className="text-rose-600 text-sm">{aiResult}</div>}
+                                {aiStatus === 'success' && (
+                                    <div className="prose prose-sm max-w-none text-slate-700">
+                                        <div dangerouslySetInnerHTML={{ __html: marked.parse(aiResult) }} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Main Combined Text Area */}
+                        <div className="flex-1 relative min-h-0 bg-white p-4 md:p-8 overflow-y-auto">
+                            <pre className="w-full font-mono text-sm md:text-base leading-relaxed text-slate-700 whitespace-pre-wrap break-words pb-32 max-w-4xl mx-auto">
+                                {combinedText}
+                            </pre>
+                            
+                            {/* Floating Actions */}
+                            <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-30">
+                                <button 
+                                    onClick={downloadTxt}
+                                    className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-blue-600 text-white hover:bg-blue-700"
+                                    title="下載合併 TXT"
+                                >
+                                    <Icons.FileText />
+                                </button>
+                                <button 
+                                    onClick={downloadHtml}
+                                    className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-orange-600 text-white hover:bg-orange-700"
+                                    title="下載精美 HTML 報告"
+                                >
+                                    <Icons.Globe />
+                                </button>
+                                <button 
+                                    onClick={copyResult}
+                                    className={`p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold ${copyState ? 'bg-emerald-600' : 'bg-slate-800 hover:bg-slate-900'} text-white`}
+                                    title="複製全部內容"
+                                >
+                                    {copyState ? <Icons.Check /> : <Icons.Clipboard />}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="h-full flex flex-col w-full">
+                    {/* App Header */}
+                    <div className="bg-slate-900 text-white p-4 shadow-lg shrink-0 z-50 flex justify-between items-center h-16 relative">
+                        <div className="flex items-center gap-3">
+                            <div className="text-emerald-400 bg-slate-800 p-1.5 rounded-lg"><Icons.ShieldCheck /></div>
+                            <div>
+                                <h1 className="text-lg font-bold tracking-wide">JW 字幕提取器</h1>
+                                <p className="text-[10px] text-emerald-400 opacity-80 font-mono tracking-widest hidden sm:block uppercase">V14 Batch Process Engine</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Router View */}
+                    {appState === 'input' && renderInputScreen()}
+                    {appState === 'processing' && renderProcessingScreen()}
+                    {appState === 'result' && renderResultScreen()}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+

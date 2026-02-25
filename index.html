@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JW 字幕提取器 (多影片版)</title>
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        
+        /* 平滑滾動 */
+        html { scroll-behavior: smooth; }
+        .scroll-smooth-container { scroll-behavior: smooth; }
+
+        /* 自訂卷軸 */
+        textarea::-webkit-scrollbar, div::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track, div::-webkit-scrollbar-track { background: transparent; }
+        textarea::-webkit-scrollbar-thumb, div::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+        textarea::-webkit-scrollbar-thumb:hover, div::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: content-box; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        
+        .progress-bar-striped {
+            background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+        }
+        @keyframes progress-stripes { from { background-position: 1rem 0; } to { background-position: 0 0; } }
+        .animate-stripes { animation: progress-stripes 1s linear infinite; }
+
+        /* 列印專屬優化設定 */
+        @media print {
+            @page { margin: 1.5cm; }
+            body { background: white !important; color: black !important; }
+            /* 隱藏所有不需要列印的 UI */
+            .print-hidden { display: none !important; }
+            /* 讓內容區塊可以無限延伸，不被卷軸截斷 */
+            .print-visible { 
+                overflow: visible !important; 
+                height: auto !important; 
+                display: block !important;
+                position: static !important;
+            }
+            /* 優化文字顯示 */
+            pre { 
+                white-space: pre-wrap !important; 
+                word-wrap: break-word !important;
+                color: black !important;
+                font-size: 11pt !important;
+                font-family: "PingFang TC", "Microsoft JhengHei", sans-serif !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .video-header {
+                font-size: 16pt !important;
+                font-weight: bold !important;
+                margin-top: 20px !important;
+                margin-bottom: 15px !important;
+                border-bottom: 2px solid #ddd !important;
+                padding-bottom: 5px !important;
+                page-break-after: avoid;
+            }
+            .main-title {
+                font-size: 22pt !important;
+                text-align: center !important;
+                margin-bottom: 20px !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans h-screen w-screen overflow-hidden flex flex-col print-visible">
+    <div id="root" class="h-full w-full print-visible"></div>
+
+    <script type="text/babel">
+        const Icons = {
+            ShieldCheck: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>,
+            Loader2: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+            Play: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="6 3 20 12 6 21 6 3"/></svg>,
+            FileText: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>,
+            Check: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="20 6 9 17 4 12"/></svg>,
+            Clipboard: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>,
+            ArrowLeft: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+            List: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
+            Download: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+            Code: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+            Trash2: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
+            Info: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        };
+
+        const PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest='
+        ];
+
+        const App = () => {
+            const [appState, setAppState] = React.useState('input'); 
+            const [inputText, setInputText] = React.useState('');
+            const [results, setResults] = React.useState([]); 
+            const [progress, setProgress] = React.useState({ current: 0, total: 0, success: 0, failed: 0 });
+            const [copyState, setCopyState] = React.useState(false);
+
+            // 增強版：支援解析 docid-, pub-, lank 網址，並自動判斷多國語言
+            const parseUrlInfo = (inputUrl) => {
+                try {
+                    const info = { id: null, lang: 'CH' };
+                    const u = new URL(inputUrl.startsWith('http') ? inputUrl : `https://${inputUrl}`);
+                    
+                    // 1. 抓取語言設定
+                    const langMatch = inputUrl.match(/jw\.org\/([^\/]+)/i);
+                    if (langMatch) {
+                        const siteLang = langMatch[1].toLowerCase();
+                        const map = { 'cmn-hant': 'CH', 'zh-hant': 'CH', 'cmn-hans': 'CHS', 'zh-hans': 'CHS', 'en': 'E', 'ja': 'J', 'ko': 'KO', 'es': 'S' };
+                        if (map[siteLang]) info.lang = map[siteLang];
+                    }
+                    if (u.searchParams.get('wtlocale')) info.lang = u.searchParams.get('wtlocale');
+
+                    // 2. 抓取影片 ID (全面支援 lank, docid, pub 格式)
+                    if (u.searchParams.get('lank')) {
+                        info.id = u.searchParams.get('lank');
+                    } else if (u.searchParams.get('docid')) {
+                        info.id = u.searchParams.get('docid');
+                    } else {
+                        const docMatch = inputUrl.match(/(docid-[a-zA-Z0-9_]+)/i);
+                        if (docMatch) {
+                            info.id = docMatch[1];
+                        } else {
+                            const pubMatch = inputUrl.match(/(pub-[a-zA-Z0-9-_]+)/i);
+                            if (pubMatch) info.id = pubMatch[1];
+                        }
+                    }
+                    return info;
+                } catch (e) { return { id: null, lang: 'CH' }; }
+            };
+
+            // 增強版字幕淨化器，專治各種亂碼、引號與錯誤換行
+            const cleanVttText = (vttContent) => {
+                if (!vttContent) return '';
+                const txt = document.createElement("textarea");
+                const decode = (str) => { txt.innerHTML = str; return txt.value; };
+                
+                // 強制移除文本中夾雜的字面量 \r, \n，並統一換行符
+                let content = vttContent.replace(/\\r\\n/g, '').replace(/\\n/g, '').replace(/\\r/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                
+                const lines = content.split('\n');
+                let resultLines = [];
+                let currentTimestamp = '';
+                
+                for (let i = 0; i < lines.length; i++) {
+                    let text = lines[i].trim();
+                    
+                    // 跳過 VTT 標籤與空行
+                    if (!text || text.startsWith('WEBVTT') || text.startsWith('NOTE') || text.startsWith('STYLE') || text.startsWith('Region:') || /^\d+$/.test(text)) continue; 
+                    
+                    // 擷取時間軸
+                    if (text.includes('-->')) {
+                        const timeMatch = text.match(/^(\d{2}:\d{2}:\d{2})/);
+                        currentTimestamp = timeMatch ? `[${timeMatch[1]}] ` : '';
+                        continue;
+                    }
+                    
+                    // 深度淨化文字
+                    text = text.replace(/<\/?[^>]+(>|$)/g, ""); // 移除 HTML 標籤
+                    text = text.replace(/^["']|["']$/g, ""); // 移除頭尾引號 (如 "[00:00:23]")
+                    text = text.replace(/","/g, ""); // 移除奇怪的 CSV 式引號
+                    text = text.trim();
+                    
+                    if (text) {
+                        resultLines.push(`${currentTimestamp}${decode(text)}`);
+                        // 同一個時間軸如果有多行文字，下一行文字前面對齊空白，不重複顯示時間
+                        currentTimestamp = '          '; 
+                    }
+                }
+                return resultLines.join('\n');
+            };
+
+            const fetchWithRetry = async (targetUrl) => {
+                try {
+                    const directRes = await fetch(targetUrl);
+                    if (directRes.ok) return directRes;
+                } catch (e) {}
+                for (let proxy of PROXIES) {
+                    try {
+                        const res = await fetch(proxy + encodeURIComponent(targetUrl));
+                        if (res.ok) return res;
+                    } catch (e) { continue; }
+                }
+                throw new Error('無法連線');
+            };
+
+            const handleStartBatch = async () => {
+                const lines = inputText.split('\n').map(l => l.trim()).filter(l => l !== '');
+                if (lines.length === 0) return;
+                
+                const urlsToProcess = lines.slice(0, 50);
+                const initialResults = urlsToProcess.map(url => ({ url, status: 'pending', id: parseUrlInfo(url).id || '未知ID' }));
+                setResults(initialResults);
+                setProgress({ current: 0, total: urlsToProcess.length, success: 0, failed: 0 });
+                setAppState('processing');
+
+                let currentResults = [...initialResults];
+                let successCount = 0; let failedCount = 0;
+
+                for (let i = 0; i < urlsToProcess.length; i++) {
+                    const url = urlsToProcess[i];
+                    let itemResult = { ...currentResults[i] };
+                    try {
+                        const { id, lang } = parseUrlInfo(url);
+                        if (!id) throw new Error('無法識別影片 ID');
+                        itemResult.id = id;
+
+                        const apiUrl = `https://b.jw-cdn.org/apis/mediator/v1/media-items/${lang}/${id}?clientType=www`;
+                        const resJSON = await fetchWithRetry(apiUrl);
+                        const data = await resJSON.json();
+                        const files = data.media?.[0]?.files || [];
+                        itemResult.title = data.media?.[0]?.title || id;
+                        
+                        const subFile = files.find(f => f.label === 'subtitles' || f.subtitles?.url);
+                        if (!subFile) throw new Error('此影片無字幕檔');
+
+                        const resVTT = await fetchWithRetry(subFile.subtitles?.url || subFile.url);
+                        itemResult.text = cleanVttText(await resVTT.text());
+                        itemResult.status = 'success';
+                        successCount++;
+                    } catch (err) {
+                        itemResult.status = 'error'; itemResult.errorMsg = err.message; failedCount++;
+                    }
+
+                    currentResults[i] = itemResult;
+                    setResults([...currentResults]);
+                    setProgress({ current: i + 1, total: urlsToProcess.length, success: successCount, failed: failedCount });
+                }
+                setAppState('result');
+            };
+
+            // 清空所有輸入的連結
+            const handleClearInput = () => {
+                setInputText('');
+            };
+
+            // 1. 複製內容
+            const copyResult = () => {
+                const successfulItems = results.filter(r => r.status === 'success');
+                const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n=========================================\n\n${item.text}\n\n`).join('');
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                setCopyState(true);
+                setTimeout(() => setCopyState(false), 2000);
+            };
+
+            // 2. 下載 TXT
+            const downloadTxt = () => {
+                const successfulItems = results.filter(r => r.status === 'success');
+                const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n=========================================\n\n${item.text}\n\n`).join('');
+                const content = `JW 字幕批次提取報告\n\n${text}`;
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `JW字幕提取_${new Date().toISOString().slice(0,10)}.txt`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            };
+
+            // 3. 下載 HTML
+            const downloadHtml = () => {
+                const successfulItems = results.filter(r => r.status === 'success');
+                let htmlContent = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>JW 字幕提取報告</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;background:#f8f9fa}h1{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:15px}.toc{background:white;border-radius:12px;padding:20px;margin-bottom:30px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}a{color:#0ea5e9;text-decoration:none}.video-card{background:white;border-radius:12px;padding:25px;margin-bottom:25px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}.video-title{color:#10b981;border-bottom:2px solid #f1f5f9;padding-bottom:12px}pre{white-space:pre-wrap;font-family:inherit;font-size:1rem;color:#475569;margin:0}</style></head><body><h1>JW 字幕提取報告</h1><div class="toc"><h2>目錄</h2><ul>${successfulItems.map((item, idx) => `<li><a href="#v${idx}">${item.title}</a></li>`).join('')}</ul></div>${successfulItems.map((item, idx) => `<div class="video-card" id="v${idx}"><h2 class="video-title">影片 ${idx + 1}: ${item.title}</h2><pre>${item.text}</pre></div>`).join('')}</body></html>`;
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `JW字幕提取_${new Date().toISOString().slice(0,10)}.html`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            };
+
+            // 4. 原生高畫質 PDF 列印
+            const generateVectorPdf = () => {
+                window.print();
+            };
+
+            const renderInputScreen = () => (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in print-hidden overflow-y-auto">
+                    <div className="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-xl border border-slate-100 my-auto">
+                        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><Icons.List /></div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800">批次影片輸入</h2>
+                                    <p className="text-sm text-slate-500">請貼上影片網址，每行一個 (最多 50 個)</p>
+                                </div>
+                            </div>
+                            
+                            {/* 一鍵刪除所有連結按鈕 */}
+                            {inputText.trim().length > 0 && (
+                                <button 
+                                    onClick={handleClearInput}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                >
+                                    <Icons.Trash2 className="w-4 h-4" />
+                                    清空
+                                </button>
+                            )}
+                        </div>
+                        <textarea
+                            className="w-full h-64 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none font-mono text-sm whitespace-pre"
+                            placeholder="https://www.jw.org/cmn-hant/..."
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                        />
+                        <button
+                            onClick={handleStartBatch}
+                            disabled={!inputText.trim()}
+                            className="mt-6 w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            <Icons.Play className="w-5 h-5 fill-current" />開始批次提取
+                        </button>
+
+                        {/* 使用說明區塊 */}
+                        <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
+                            <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-base">
+                                <Icons.Info className="w-5 h-5 text-emerald-600" />
+                                使用說明
+                            </h3>
+                            <ul className="list-disc list-inside space-y-2 ml-1">
+                                <li>請前往 <a href="https://www.jw.org" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">jw.org</a> 尋找您需要的影片。</li>
+                                <li>複製影片網頁的網址並貼入上方文字框。</li>
+                                <li>若要批次處理，請<strong>換行(每行一個連結）</strong>。</li>
+                                <li>支援網址中包含 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">lank</code>, <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">docid</code> 或 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">pub</code> 的各種格式。</li>
+                                <li>為確保系統穩定性，單次批次處理上限為 <strong>50</strong> 部影片。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderProcessingScreen = () => {
+                const percent = progress.total === 0 ? 0 : Math.round((progress.current / progress.total) * 100);
+                return (
+                    <div className="flex-1 flex flex-col items-center p-6 animate-fade-in bg-slate-50 print-hidden">
+                        <div className="w-full max-w-3xl bg-white p-8 rounded-2xl shadow-md border border-slate-100 mb-6 mt-10">
+                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3 mb-6">
+                                <Icons.Loader2 className="animate-spin text-emerald-500" />處理中... {percent}%
+                            </h2>
+                            <div className="w-full bg-slate-100 rounded-full h-4 mb-2"><div className="bg-emerald-500 h-4 rounded-full progress-bar-striped animate-stripes" style={{ width: `${percent}%` }}></div></div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderResultScreen = () => {
+                const successfulItems = results.filter(r => r.status === 'success');
+                
+                return (
+                    <div className="flex-1 flex flex-col h-full overflow-hidden bg-white animate-fade-in relative min-h-0 print-visible">
+                        
+                        {/* 頂部操作列 (列印時隱藏) */}
+                        <div className="bg-slate-50 p-3 border-b border-slate-200 flex flex-wrap gap-2 items-center shrink-0 z-10 px-4 print-hidden">
+                            <button onClick={() => setAppState('input')} className="mr-2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-bold transition-colors"><Icons.ArrowLeft className="w-4 h-4"/>返回修改</button>
+                        </div>
+
+                        {/* 主要內容區 (列印時唯一顯示的區域，加入 scroll-smooth-container 以支援平滑滾動) */}
+                        <div className="flex-1 relative bg-white p-4 md:p-8 overflow-y-auto print-visible scroll-smooth-container">
+                            
+                            {/* 列印時顯示的專屬標題 */}
+                            <div className="hidden print:block main-title">JW 字幕批次提取報告</div>
+
+                            <div className="max-w-4xl mx-auto pb-32 print:pb-0">
+                                {successfulItems.length === 0 ? (
+                                    <p className="text-slate-500 text-center py-10">沒有成功提取的字幕。請檢查網址是否正確。</p>
+                                ) : (
+                                    <>
+                                        {/* 新增的目錄區塊 (Table of Contents) */}
+                                        {successfulItems.length > 1 && (
+                                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-10 print-visible shadow-sm">
+                                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-200 pb-3">
+                                                    <Icons.List className="w-5 h-5 text-emerald-600" />
+                                                    提取結果目錄 (共 {successfulItems.length} 部影片)
+                                                </h3>
+                                                <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm md:text-base">
+                                                    {successfulItems.map((item, index) => (
+                                                        <li key={`toc-${index}`}>
+                                                            <a href={`#v${index}`} className="text-emerald-700 hover:text-emerald-500 hover:underline flex items-start gap-2 group">
+                                                                <span className="text-slate-400 font-mono mt-0.5 min-w-[1.5rem]">{(index + 1)}.</span>
+                                                                <span className="break-words group-hover:text-emerald-600">{item.title || item.id}</span>
+                                                            </a>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* 影片字幕內容列表 */}
+                                        {successfulItems.map((item, index) => (
+                                            <div key={index} id={`v${index}`} className="mb-10 print:mb-8 scroll-mt-6">
+                                                {/* 在網頁版與列印版都有好看的標題 */}
+                                                <h2 className="text-emerald-600 font-bold text-lg md:text-xl border-b-2 border-slate-100 pb-2 mb-4 print:video-header">
+                                                    影片 {index + 1}: {item.title || item.id}
+                                                </h2>
+                                                <pre className="w-full font-mono text-xs md:text-sm leading-relaxed text-slate-700 whitespace-pre-wrap break-words">{item.text}</pre>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+                            
+                            {/* 懸浮按鈕列 (列印時隱藏) */}
+                            <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-30 print-hidden">
+                                <button onClick={generateVectorPdf} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-red-600 text-white hover:bg-red-700" title="呼叫系統列印 (另存為完美 PDF)">
+                                    <Icons.Download />
+                                </button>
+                                <button onClick={downloadHtml} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-purple-600 text-white hover:bg-purple-700" title="下載網頁版 (HTML)">
+                                    <Icons.Code />
+                                </button>
+                                <button onClick={downloadTxt} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-blue-600 text-white hover:bg-blue-700" title="下載純文字版 (TXT)">
+                                    <Icons.FileText />
+                                </button>
+                                <button onClick={copyResult} className={`p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold ${copyState ? 'bg-emerald-600' : 'bg-slate-800'} text-white`} title="複製全部內容">
+                                    {copyState ? <Icons.Check /> : <Icons.Clipboard />}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="h-full w-full bg-white relative print-visible">
+                    <div className="h-full flex flex-col w-full print-visible">
+                        {/* 頂部導航列 (列印時隱藏) */}
+                        <div className="bg-slate-900 text-white p-4 shadow-lg shrink-0 z-50 flex justify-between items-center h-16 print-hidden">
+                            <div className="flex items-center gap-3">
+                                <div className="text-emerald-400 bg-slate-800 p-1.5 rounded-lg"><Icons.ShieldCheck /></div>
+                                <div><h1 className="text-base md:text-lg font-bold">JW 字幕提取器 (多影片版)</h1></div>
+                            </div>
+                        </div>
+                        {appState === 'input' && renderInputScreen()}
+                        {appState === 'processing' && renderProcessingScreen()}
+                        {appState === 'result' && renderResultScreen()}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -63,9 +63,16 @@
                 font-size: 16pt !important;
                 font-weight: bold !important;
                 margin-top: 20px !important;
-                margin-bottom: 15px !important;
+                margin-bottom: 5px !important;
                 border-bottom: 2px solid #ddd !important;
                 padding-bottom: 5px !important;
+                page-break-after: avoid;
+            }
+            .video-url-print {
+                font-size: 10pt !important;
+                color: #555 !important;
+                margin-bottom: 15px !important;
+                word-break: break-all !important;
                 page-break-after: avoid;
             }
             .main-title {
@@ -92,7 +99,8 @@
             Download: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
             Code: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
             Trash2: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
-            Info: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Info: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>,
+            Link: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         };
 
         const PROXIES = [
@@ -246,10 +254,10 @@
                 setInputText('');
             };
 
-            // 1. 複製內容
+            // 1. 複製內容 (加入網址)
             const copyResult = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
-                const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n=========================================\n\n${item.text}\n\n`).join('');
+                const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n網址: ${item.url}\n=========================================\n\n${item.text}\n\n`).join('');
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
                 document.body.appendChild(textArea);
@@ -260,10 +268,10 @@
                 setTimeout(() => setCopyState(false), 2000);
             };
 
-            // 2. 下載 TXT
+            // 2. 下載 TXT (加入網址)
             const downloadTxt = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
-                const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n=========================================\n\n${item.text}\n\n`).join('');
+                const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n網址: ${item.url}\n=========================================\n\n${item.text}\n\n`).join('');
                 const content = `JW 字幕批次提取報告\n\n${text}`;
                 const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
@@ -272,10 +280,10 @@
                 document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
             };
 
-            // 3. 下載 HTML
+            // 3. 下載 HTML (加入網址)
             const downloadHtml = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
-                let htmlContent = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>JW 字幕提取報告</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;background:#f8f9fa}h1{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:15px}.toc{background:white;border-radius:12px;padding:20px;margin-bottom:30px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}a{color:#0ea5e9;text-decoration:none}.video-card{background:white;border-radius:12px;padding:25px;margin-bottom:25px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}.video-title{color:#10b981;border-bottom:2px solid #f1f5f9;padding-bottom:12px}pre{white-space:pre-wrap;font-family:inherit;font-size:1rem;color:#475569;margin:0}</style></head><body><h1>JW 字幕提取報告</h1><div class="toc"><h2>目錄</h2><ul>${successfulItems.map((item, idx) => `<li><a href="#v${idx}">${item.title}</a></li>`).join('')}</ul></div>${successfulItems.map((item, idx) => `<div class="video-card" id="v${idx}"><h2 class="video-title">影片 ${idx + 1}: ${item.title}</h2><pre>${item.text}</pre></div>`).join('')}</body></html>`;
+                let htmlContent = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>JW 字幕提取報告</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;background:#f8f9fa}h1{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:15px}.toc{background:white;border-radius:12px;padding:20px;margin-bottom:30px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}a{color:#0ea5e9;text-decoration:none}.video-card{background:white;border-radius:12px;padding:25px;margin-bottom:25px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}.video-title{color:#10b981;border-bottom:2px solid #f1f5f9;padding-bottom:12px;margin-bottom:8px;}pre{white-space:pre-wrap;font-family:inherit;font-size:1rem;color:#475569;margin:0}</style></head><body><h1>JW 字幕提取報告</h1><div class="toc"><h2>目錄</h2><ul>${successfulItems.map((item, idx) => `<li><a href="#v${idx}">${item.title}</a></li>`).join('')}</ul></div>${successfulItems.map((item, idx) => `<div class="video-card" id="v${idx}"><h2 class="video-title">影片 ${idx + 1}: ${item.title}</h2><p style="word-break: break-all; font-size: 0.9em; margin-top: 0; margin-bottom: 20px;"><a href="${item.url}" target="_blank">${item.url}</a></p><pre>${item.text}</pre></div>`).join('')}</body></html>`;
                 const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -403,9 +411,18 @@
                                         {successfulItems.map((item, index) => (
                                             <div key={index} id={`v${index}`} className="mb-10 print:mb-8 scroll-mt-6">
                                                 {/* 在網頁版與列印版都有好看的標題 */}
-                                                <h2 className="text-emerald-600 font-bold text-lg md:text-xl border-b-2 border-slate-100 pb-2 mb-4 print:video-header">
+                                                <h2 className="text-emerald-600 font-bold text-lg md:text-xl border-b-2 border-slate-100 pb-2 mb-2 print:video-header">
                                                     影片 {index + 1}: {item.title || item.id}
                                                 </h2>
+                                                
+                                                {/* 原始絕對連結 (列印版與網頁版都會顯示) */}
+                                                <div className="mb-4 print:video-url-print">
+                                                    <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:text-blue-700 hover:underline break-all flex items-center gap-1.5 w-fit">
+                                                        <Icons.Link className="w-4 h-4 shrink-0 print-hidden" />
+                                                        {item.url}
+                                                    </a>
+                                                </div>
+
                                                 <pre className="w-full font-mono text-xs md:text-sm leading-relaxed text-slate-700 whitespace-pre-wrap break-words">{item.text}</pre>
                                             </div>
                                         ))}

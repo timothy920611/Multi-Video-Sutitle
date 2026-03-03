@@ -115,6 +115,9 @@
             const [results, setResults] = React.useState([]); 
             const [progress, setProgress] = React.useState({ current: 0, total: 0, success: 0, failed: 0 });
             const [copyState, setCopyState] = React.useState(false);
+            
+            // 新增：自定義檔案名稱的 state
+            const [fileName, setFileName] = React.useState('JW字幕提取報告');
 
             // 增強版：支援解析 docid-, pub-, lank 網址，並自動判斷多國語言
             const parseUrlInfo = (inputUrl) => {
@@ -249,12 +252,17 @@
                 setAppState('result');
             };
 
-            // 清空所有輸入的連結
             const handleClearInput = () => {
                 setInputText('');
             };
 
-            // 1. 複製內容 (加入網址)
+            // 取得匯出的檔案名稱
+            const getExportName = () => {
+                const name = fileName.trim();
+                return name ? name : `JW字幕提取_${new Date().toISOString().slice(0,10)}`;
+            };
+
+            // 1. 複製內容
             const copyResult = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
                 const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n網址: ${item.url}\n=========================================\n\n${item.text}\n\n`).join('');
@@ -268,32 +276,38 @@
                 setTimeout(() => setCopyState(false), 2000);
             };
 
-            // 2. 下載 TXT (加入網址)
+            // 2. 下載 TXT
             const downloadTxt = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
                 const text = successfulItems.map((item, index) => `=========================================\n影片 ${index + 1}: ${item.title}\n網址: ${item.url}\n=========================================\n\n${item.text}\n\n`).join('');
-                const content = `JW 字幕批次提取報告\n\n${text}`;
+                const content = `${getExportName()}\n\n${text}`;
                 const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = `JW字幕提取_${new Date().toISOString().slice(0,10)}.txt`;
+                a.href = url; a.download = `${getExportName()}.txt`;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
             };
 
-            // 3. 下載 HTML (加入網址)
+            // 3. 下載 HTML
             const downloadHtml = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
-                let htmlContent = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>JW 字幕提取報告</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;background:#f8f9fa}h1{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:15px}.toc{background:white;border-radius:12px;padding:20px;margin-bottom:30px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}a{color:#0ea5e9;text-decoration:none}.video-card{background:white;border-radius:12px;padding:25px;margin-bottom:25px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}.video-title{color:#10b981;border-bottom:2px solid #f1f5f9;padding-bottom:12px;margin-bottom:8px;}pre{white-space:pre-wrap;font-family:inherit;font-size:1rem;color:#475569;margin:0}</style></head><body><h1>JW 字幕提取報告</h1><div class="toc"><h2>目錄</h2><ul>${successfulItems.map((item, idx) => `<li><a href="#v${idx}">${item.title}</a></li>`).join('')}</ul></div>${successfulItems.map((item, idx) => `<div class="video-card" id="v${idx}"><h2 class="video-title">影片 ${idx + 1}: ${item.title}</h2><p style="word-break: break-all; font-size: 0.9em; margin-top: 0; margin-bottom: 20px;"><a href="${item.url}" target="_blank">${item.url}</a></p><pre>${item.text}</pre></div>`).join('')}</body></html>`;
+                const titleText = getExportName();
+                let htmlContent = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${titleText}</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;background:#f8f9fa}h1{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:15px}.toc{background:white;border-radius:12px;padding:20px;margin-bottom:30px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}a{color:#0ea5e9;text-decoration:none}.video-card{background:white;border-radius:12px;padding:25px;margin-bottom:25px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}.video-title{color:#10b981;border-bottom:2px solid #f1f5f9;padding-bottom:12px;margin-bottom:8px;}pre{white-space:pre-wrap;font-family:inherit;font-size:1rem;color:#475569;margin:0}</style></head><body><h1>${titleText}</h1><div class="toc"><h2>目錄</h2><ul>${successfulItems.map((item, idx) => `<li><a href="#v${idx}">${item.title}</a></li>`).join('')}</ul></div>${successfulItems.map((item, idx) => `<div class="video-card" id="v${idx}"><h2 class="video-title">影片 ${idx + 1}: ${item.title}</h2><p style="word-break: break-all; font-size: 0.9em; margin-top: 0; margin-bottom: 20px;"><a href="${item.url}" target="_blank">${item.url}</a></p><pre>${item.text}</pre></div>`).join('')}</body></html>`;
                 const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = `JW字幕提取_${new Date().toISOString().slice(0,10)}.html`;
+                a.href = url; a.download = `${titleText}.html`;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
             };
 
             // 4. 原生高畫質 PDF 列印
             const generateVectorPdf = () => {
+                // 暫時更改 document.title 讓瀏覽器存檔時帶入我們自訂的檔名
+                const originalTitle = document.title;
+                document.title = getExportName();
                 window.print();
+                // 延遲恢復，避免列印對話框還沒抓到標題就改回來了
+                setTimeout(() => { document.title = originalTitle; }, 500);
             };
 
             const renderInputScreen = () => (
@@ -371,23 +385,37 @@
                 return (
                     <div className="flex-1 flex flex-col h-full overflow-hidden bg-white animate-fade-in relative min-h-0 print-visible">
                         
-                        {/* 頂部操作列 (列印時隱藏) */}
-                        <div className="bg-slate-50 p-3 border-b border-slate-200 flex flex-wrap gap-2 items-center shrink-0 z-10 px-4 print-hidden">
-                            <button onClick={() => setAppState('input')} className="mr-2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-bold transition-colors"><Icons.ArrowLeft className="w-4 h-4"/>返回修改</button>
+                        {/* 頂部操作列 (加入自定義名稱與列印時隱藏) */}
+                        <div className="bg-slate-50 p-3 border-b border-slate-200 flex flex-wrap gap-4 items-center justify-between shrink-0 z-10 px-4 print-hidden">
+                            <button onClick={() => setAppState('input')} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-bold transition-colors">
+                                <Icons.ArrowLeft className="w-4 h-4"/>返回修改
+                            </button>
+                            
+                            {/* 新增：自定義檔案名稱輸入框 */}
+                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all flex-1 max-w-md">
+                                <Icons.FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                                <input 
+                                    type="text" 
+                                    value={fileName} 
+                                    onChange={(e) => setFileName(e.target.value)} 
+                                    placeholder="自定義檔案名稱..."
+                                    className="bg-transparent border-none outline-none text-sm w-full text-slate-700 placeholder-slate-400 font-medium"
+                                />
+                            </div>
                         </div>
 
-                        {/* 主要內容區 (列印時唯一顯示的區域，加入 scroll-smooth-container 以支援平滑滾動) */}
+                        {/* 主要內容區 */}
                         <div className="flex-1 relative bg-white p-4 md:p-8 overflow-y-auto print-visible scroll-smooth-container">
                             
-                            {/* 列印時顯示的專屬標題 */}
-                            <div className="hidden print:block main-title">JW 字幕批次提取報告</div>
+                            {/* 列印時顯示的專屬標題 (連動自定義名稱) */}
+                            <div className="hidden print:block main-title">{getExportName()}</div>
 
                             <div className="max-w-4xl mx-auto pb-32 print:pb-0">
                                 {successfulItems.length === 0 ? (
                                     <p className="text-slate-500 text-center py-10">沒有成功提取的字幕。請檢查網址是否正確。</p>
                                 ) : (
                                     <>
-                                        {/* 新增的目錄區塊 (Table of Contents) */}
+                                        {/* 目錄區塊 */}
                                         {successfulItems.length > 1 && (
                                             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-10 print-visible shadow-sm">
                                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-200 pb-3">
@@ -410,12 +438,10 @@
                                         {/* 影片字幕內容列表 */}
                                         {successfulItems.map((item, index) => (
                                             <div key={index} id={`v${index}`} className="mb-10 print:mb-8 scroll-mt-6">
-                                                {/* 在網頁版與列印版都有好看的標題 */}
                                                 <h2 className="text-emerald-600 font-bold text-lg md:text-xl border-b-2 border-slate-100 pb-2 mb-2 print:video-header">
                                                     影片 {index + 1}: {item.title || item.id}
                                                 </h2>
                                                 
-                                                {/* 原始絕對連結 (列印版與網頁版都會顯示) */}
                                                 <div className="mb-4 print:video-url-print">
                                                     <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:text-blue-700 hover:underline break-all flex items-center gap-1.5 w-fit">
                                                         <Icons.Link className="w-4 h-4 shrink-0 print-hidden" />
@@ -430,9 +456,9 @@
                                 )}
                             </div>
                             
-                            {/* 懸浮按鈕列 (列印時隱藏) */}
+                            {/* 懸浮按鈕列 */}
                             <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-30 print-hidden">
-                                <button onClick={generateVectorPdf} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-red-600 text-white hover:bg-red-700" title="呼叫系統列印 (另存為完美 PDF)">
+                                <button onClick={generateVectorPdf} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-red-600 text-white hover:bg-red-700" title="列印 / 存為 PDF">
                                     <Icons.Download />
                                 </button>
                                 <button onClick={downloadHtml} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-purple-600 text-white hover:bg-purple-700" title="下載網頁版 (HTML)">
@@ -456,10 +482,12 @@
                         {/* 頂部導航列 (列印時隱藏) */}
                         <div className="bg-slate-900 text-white p-4 shadow-lg shrink-0 z-50 flex justify-between items-center h-16 print-hidden">
                             <div className="flex items-center gap-3">
-                                <div className="text-emerald-400 bg-slate-800 p-1.5 rounded-lg"><Icons.ShieldCheck /></div>
-                                <div><h1 className="text-base md:text-lg font-bold">JW 字幕提取器 (多影片版)</h1></div>
+                                <Icons.ShieldCheck className="w-6 h-6 text-emerald-400" />
+                                <h1 className="text-lg font-bold tracking-wide">JW 字幕提取器</h1>
                             </div>
+                            <span className="text-xs text-slate-400 font-mono bg-slate-800 px-2 py-1 rounded">多影片批次版</span>
                         </div>
+
                         {appState === 'input' && renderInputScreen()}
                         {appState === 'processing' && renderProcessingScreen()}
                         {appState === 'result' && renderResultScreen()}

@@ -15,71 +15,26 @@
 
     <style>
         body { -webkit-tap-highlight-color: transparent; }
-        
-        /* 平滑滾動 */
         html { scroll-behavior: smooth; }
         .scroll-smooth-container { scroll-behavior: smooth; }
-
-        /* 自訂卷軸 */
         textarea::-webkit-scrollbar, div::-webkit-scrollbar { width: 8px; }
         textarea::-webkit-scrollbar-track, div::-webkit-scrollbar-track { background: transparent; }
         textarea::-webkit-scrollbar-thumb, div::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
         textarea::-webkit-scrollbar-thumb:hover, div::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: content-box; }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        
-        .progress-bar-striped {
-            background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
-            background-size: 1rem 1rem;
-        }
+        .progress-bar-striped { background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent); background-size: 1rem 1rem; }
         @keyframes progress-stripes { from { background-position: 1rem 0; } to { background-position: 0 0; } }
         .animate-stripes { animation: progress-stripes 1s linear infinite; }
-
-        /* 列印專屬優化設定 */
         @media print {
             @page { margin: 1.5cm; }
             body { background: white !important; color: black !important; }
-            /* 隱藏所有不需要列印的 UI */
             .print-hidden { display: none !important; }
-            /* 讓內容區塊可以無限延伸，不被卷軸截斷 */
-            .print-visible { 
-                overflow: visible !important; 
-                height: auto !important; 
-                display: block !important;
-                position: static !important;
-            }
-            /* 優化文字顯示 */
-            pre { 
-                white-space: pre-wrap !important; 
-                word-wrap: break-word !important;
-                color: black !important;
-                font-size: 11pt !important;
-                font-family: "PingFang TC", "Microsoft JhengHei", sans-serif !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            .video-header {
-                font-size: 16pt !important;
-                font-weight: bold !important;
-                margin-top: 20px !important;
-                margin-bottom: 5px !important;
-                border-bottom: 2px solid #ddd !important;
-                padding-bottom: 5px !important;
-                page-break-after: avoid;
-            }
-            .video-url-print {
-                font-size: 10pt !important;
-                color: #555 !important;
-                margin-bottom: 15px !important;
-                word-break: break-all !important;
-                page-break-after: avoid;
-            }
-            .main-title {
-                font-size: 22pt !important;
-                text-align: center !important;
-                margin-bottom: 20px !important;
-            }
+            .print-visible { overflow: visible !important; height: auto !important; display: block !important; position: static !important; }
+            pre { white-space: pre-wrap !important; word-wrap: break-word !important; color: black !important; font-size: 11pt !important; font-family: "PingFang TC", "Microsoft JhengHei", sans-serif !important; margin: 0 !important; padding: 0 !important; }
+            .video-header { font-size: 16pt !important; font-weight: bold !important; margin-top: 20px !important; margin-bottom: 5px !important; border-bottom: 2px solid #ddd !important; padding-bottom: 5px !important; page-break-after: avoid; }
+            .video-url-print { font-size: 10pt !important; color: #555 !important; margin-bottom: 15px !important; word-break: break-all !important; page-break-after: avoid; }
+            .main-title { font-size: 22pt !important; text-align: center !important; margin-bottom: 20px !important; }
         }
     </style>
 </head>
@@ -122,7 +77,6 @@
                 try {
                     const info = { id: null, lang: 'CH' };
                     const u = new URL(inputUrl.startsWith('http') ? inputUrl : `https://${inputUrl}`);
-                    
                     if (u.searchParams.get('lank')) {
                         info.id = u.searchParams.get('lank');
                     } else if (u.searchParams.get('docid')) {
@@ -136,7 +90,6 @@
                             if (pubMatch) info.id = pubMatch[1];
                         }
                     }
-
                     const langMatch = inputUrl.match(/jw\.org\/([^\/]+)/i);
                     if (langMatch) {
                         const siteLang = langMatch[1].toLowerCase();
@@ -144,7 +97,6 @@
                         if (map[siteLang]) info.lang = map[siteLang];
                     }
                     if (u.searchParams.get('wtlocale')) info.lang = u.searchParams.get('wtlocale');
-
                     return info;
                 } catch (e) { return { id: null, lang: 'CH' }; }
             };
@@ -153,28 +105,22 @@
                 if (!vttContent) return '';
                 const txt = document.createElement("textarea");
                 const decode = (str) => { txt.innerHTML = str; return txt.value; };
-                
                 let content = vttContent.replace(/\\r\\n/g, '').replace(/\\n/g, '').replace(/\\r/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                
                 const lines = content.split('\n');
                 let resultLines = [];
                 let currentTimestamp = '';
-                
                 for (let i = 0; i < lines.length; i++) {
                     let text = lines[i].trim();
                     if (!text || text.startsWith('WEBVTT') || text.startsWith('NOTE') || text.startsWith('STYLE') || text.startsWith('Region:') || /^\d+$/.test(text)) continue; 
-                    
                     if (text.includes('-->')) {
                         const timeMatch = text.match(/^(\d{2}:\d{2}:\d{2})/);
                         currentTimestamp = timeMatch ? `[${timeMatch[1]}] ` : '';
                         continue;
                     }
-                    
                     text = text.replace(/<\/?[^>]+(>|$)/g, ""); 
                     text = text.replace(/^["']|["']$/g, ""); 
                     text = text.replace(/","/g, ""); 
                     text = text.trim();
-                    
                     if (text) {
                         resultLines.push(`${currentTimestamp}${decode(text)}`);
                         currentTimestamp = '          '; 
@@ -197,24 +143,22 @@
                 throw new Error('無法連線');
             };
 
-            // 【功能更新】 加入併發請求限制，並使用 Promise.all 加速
             const handleStartBatch = async () => {
                 const lines = inputText.split('\n').map(l => l.trim()).filter(l => l !== '');
                 if (lines.length === 0) return;
                 
-                const urlsToProcess = lines.slice(0, 50);
-                const initialResults = urlsToProcess.map(url => ({ url, status: 'pending', id: parseUrlInfo(url).id || '未知ID' }));
+                // 【更新】 提高上限至 200
+                const urlsToProcess = lines.slice(0, 200);
                 
+                const initialResults = urlsToProcess.map(url => ({ url, status: 'pending', id: parseUrlInfo(url).id || '未知ID' }));
                 setResults([...initialResults]);
                 setProgress({ current: 0, total: urlsToProcess.length, success: 0, failed: 0 });
                 setAppState('processing');
-
                 let currentResults = [...initialResults];
                 let successCount = 0; 
                 let failedCount = 0;
                 let currentIndex = 0;
 
-                // 單一任務處理函數
                 const processItem = async (index) => {
                     const url = urlsToProcess[index];
                     let itemResult = { ...currentResults[index] };
@@ -222,16 +166,13 @@
                         const { id, lang } = parseUrlInfo(url);
                         if (!id) throw new Error('無法識別影片 ID');
                         itemResult.id = id;
-
                         const apiUrl = `https://b.jw-cdn.org/apis/mediator/v1/media-items/${lang}/${id}?clientType=www`;
                         const resJSON = await fetchWithRetry(apiUrl);
                         const data = await resJSON.json();
                         const files = data.media?.[0]?.files || [];
                         itemResult.title = data.media?.[0]?.title || id;
-                        
                         const subFile = files.find(f => f.label === 'subtitles' || f.subtitles?.url);
                         if (!subFile) throw new Error('此影片無字幕檔');
-
                         const resVTT = await fetchWithRetry(subFile.subtitles?.url || subFile.url);
                         itemResult.text = cleanVttText(await resVTT.text());
                         itemResult.status = 'success';
@@ -241,68 +182,53 @@
                         itemResult.errorMsg = err.message; 
                         failedCount++;
                     }
-
-                    // 更新此項目的狀態並寫回 React State
                     currentResults[index] = itemResult;
                     setResults([...currentResults]);
-                    setProgress({ 
-                        current: successCount + failedCount, 
-                        total: urlsToProcess.length, 
-                        success: successCount, 
-                        failed: failedCount 
-                    });
+                    setProgress({ current: successCount + failedCount, total: urlsToProcess.length, success: successCount, failed: failedCount });
                 };
 
-                // worker 函數：不斷從陣列中拿取下一個任務來執行
                 const worker = async () => {
                     while (true) {
                         const i = currentIndex;
                         if (i >= urlsToProcess.length) break;
-                        currentIndex++; // 先推進 index 避免其它 worker 拿到相同的任務
+                        currentIndex++;
                         await processItem(i);
                     }
                 };
-
-                // 設定最大併發數 (同時處理 3 個請求)
                 const CONCURRENCY_LIMIT = 3;
                 const activeWorkers = Math.min(CONCURRENCY_LIMIT, urlsToProcess.length);
                 const workersArray = Array(activeWorkers).fill(0).map(() => worker());
-
-                // 等待所有 worker 完成
                 await Promise.all(workersArray);
-                
                 setAppState('result');
             };
 
-            const handleClearInput = () => {
-                setInputText('');
-            };
+            const handleClearInput = () => setInputText('');
+            const getExportName = () => fileName.trim() ? fileName.trim() : `JW字幕提取_${new Date().toISOString().slice(0,10)}`;
 
-            const getExportName = () => {
-                const name = fileName.trim();
-                return name ? name : `JW字幕提取_${new Date().toISOString().slice(0,10)}`;
-            };
-
-            // 【功能更新】 產生 Markdown 格式文字的輔助函數
             const generateMarkdownContent = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
-                let md = `# ${getExportName()}\n\n`;
+                const docTitle = getExportName();
+                let md = `# ${docTitle}\n\n`;
                 
+                md += `## 目錄\n\n`;
                 successfulItems.forEach((item, index) => {
+                    const anchor = `v${index}`;
+                    md += `${index + 1}. [${item.title}](#${anchor})\n`;
+                });
+                md += `\n---\n\n`;
+
+                successfulItems.forEach((item, index) => {
+                    const anchor = `v${index}`;
+                    md += `<a name="${anchor}"></a>\n`;
                     md += `## 影片 ${index + 1}: ${item.title}\n`;
                     md += `- **網址**: [${item.url}](${item.url})\n\n`;
-                    
-                    // 將單純的換行替換為「兩個空格 + 換行」，觸發 Markdown 的強制換行
                     const formattedText = item.text.replace(/\n/g, '  \n');
                     md += `${formattedText}\n\n`;
-                    
                     md += `---\n\n`;
                 });
-                
                 return md;
             };
 
-            // 1. 複製內容 (改為複製 Markdown 格式)
             const copyResult = () => {
                 const text = generateMarkdownContent();
                 const textArea = document.createElement("textarea");
@@ -315,7 +241,6 @@
                 setTimeout(() => setCopyState(false), 2000);
             };
 
-            // 2. 下載 MD (改用 Markdown 格式與 .md 副檔名)
             const downloadMarkdown = () => {
                 const content = generateMarkdownContent();
                 const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
@@ -325,7 +250,6 @@
                 document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
             };
 
-            // 3. 下載 HTML
             const downloadHtml = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
                 const titleText = getExportName();
@@ -337,7 +261,6 @@
                 document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
             };
 
-            // 4. 原生高畫質 PDF 列印
             const generateVectorPdf = () => {
                 const originalTitle = document.title;
                 document.title = getExportName();
@@ -353,45 +276,21 @@
                                 <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><Icons.List /></div>
                                 <div>
                                     <h2 className="text-xl font-bold text-slate-800">批次影片輸入</h2>
-                                    <p className="text-sm text-slate-500">請貼上影片網址，每行一個 (最多 50 個)</p>
+                                    <p className="text-sm text-slate-500">請貼上影片網址，每行一個 (最多 200 個)</p>
                                 </div>
                             </div>
-                            
-                            {inputText.trim().length > 0 && (
-                                <button 
-                                    onClick={handleClearInput}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                                >
-                                    <Icons.Trash2 className="w-4 h-4" />
-                                    清空
-                                </button>
-                            )}
+                            {inputText.trim().length > 0 && <button onClick={handleClearInput} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><Icons.Trash2 className="w-4 h-4" />清空</button>}
                         </div>
-                        <textarea
-                            className="w-full h-64 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none font-mono text-sm whitespace-pre"
-                            placeholder="https://www.jw.org/cmn-hant/..."
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                        />
-                        <button
-                            onClick={handleStartBatch}
-                            disabled={!inputText.trim()}
-                            className="mt-6 w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                            <Icons.Play className="w-5 h-5 fill-current" />開始批次提取
-                        </button>
-
+                        <textarea className="w-full h-64 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none font-mono text-sm whitespace-pre" placeholder="https://www.jw.org/cmn-hant/..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
+                        <button onClick={handleStartBatch} disabled={!inputText.trim()} className="mt-6 w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Icons.Play className="w-5 h-5 fill-current" />開始批次提取</button>
                         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
-                            <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-base">
-                                <Icons.Info className="w-5 h-5 text-emerald-600" />
-                                使用說明
-                            </h3>
+                            <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-base"><Icons.Info className="w-5 h-5 text-emerald-600" />使用說明</h3>
                             <ul className="list-disc list-inside space-y-2 ml-1">
                                 <li>請前往 <a href="https://www.jw.org" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">jw.org</a> 尋找您需要的影片。</li>
                                 <li>複製影片網頁的網址並貼入上方文字框。</li>
                                 <li>若要批次處理，請<strong>換行(每行一個連結）</strong>。</li>
-                                <li>支援網址中包含 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">lank</code>, <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">docid</code> 或 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">pub</code> 的各種格式。</li>
-                                <li>為確保系統穩定性，單次批次處理上限為 <strong>50</strong> 部影片。</li>
+                                <li>支援包含 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">lank</code>, <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">docid</code> 或 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">pub</code> 的各種格式。</li>
+                                <li>為確保系統穩定性，單次批次處理上限已提高至 <strong>200</strong> 部影片。</li>
                             </ul>
                         </div>
                     </div>
@@ -414,31 +313,19 @@
 
             const renderResultScreen = () => {
                 const successfulItems = results.filter(r => r.status === 'success');
-                
                 return (
                     <div className="flex-1 flex flex-col h-full overflow-hidden bg-white animate-fade-in relative min-h-0 print-visible">
-                        
                         <div className="bg-slate-50 p-3 border-b border-slate-200 flex flex-wrap gap-4 items-center justify-between shrink-0 z-10 px-4 print-hidden">
                             <button onClick={() => setAppState('input')} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-bold transition-colors">
                                 <Icons.ArrowLeft className="w-4 h-4"/>返回修改
                             </button>
-                            
                             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all flex-1 max-w-md">
                                 <Icons.FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                                <input 
-                                    type="text" 
-                                    value={fileName} 
-                                    onChange={(e) => setFileName(e.target.value)} 
-                                    placeholder="自定義檔案名稱..."
-                                    className="bg-transparent border-none outline-none text-sm w-full text-slate-700 placeholder-slate-400 font-medium"
-                                />
+                                <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="自定義檔案名稱..." className="bg-transparent border-none outline-none text-sm w-full text-slate-700 placeholder-slate-400 font-medium" />
                             </div>
                         </div>
-
                         <div className="flex-1 relative bg-white p-4 md:p-8 overflow-y-auto print-visible scroll-smooth-container">
-                            
                             <div className="hidden print:block main-title">{getExportName()}</div>
-
                             <div className="max-w-4xl mx-auto pb-32 print:pb-0">
                                 {successfulItems.length === 0 ? (
                                     <p className="text-slate-500 text-center py-10">沒有成功提取的字幕。請檢查網址是否正確。</p>
@@ -462,40 +349,28 @@
                                                 </ul>
                                             </div>
                                         )}
-
                                         {successfulItems.map((item, index) => (
                                             <div key={index} id={`v${index}`} className="mb-10 print:mb-8 scroll-mt-6">
                                                 <h2 className="text-emerald-600 font-bold text-lg md:text-xl border-b-2 border-slate-100 pb-2 mb-2 print:video-header">
                                                     影片 {index + 1}: {item.title || item.id}
                                                 </h2>
-                                                
                                                 <div className="mb-4 print:video-url-print">
                                                     <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:text-blue-700 hover:underline break-all flex items-center gap-1.5 w-fit">
                                                         <Icons.Link className="w-4 h-4 shrink-0 print-hidden" />
                                                         {item.url}
                                                     </a>
                                                 </div>
-
                                                 <pre className="w-full font-mono text-xs md:text-sm leading-relaxed text-slate-700 whitespace-pre-wrap break-words">{item.text}</pre>
                                             </div>
                                         ))}
                                     </>
                                 )}
                             </div>
-                            
                             <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-30 print-hidden">
-                                <button onClick={generateVectorPdf} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-red-600 text-white hover:bg-red-700" title="列印 / 存為 PDF">
-                                    <Icons.Download />
-                                </button>
-                                <button onClick={downloadHtml} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-purple-600 text-white hover:bg-purple-700" title="下載網頁版 (HTML)">
-                                    <Icons.Code />
-                                </button>
-                                <button onClick={downloadMarkdown} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-blue-600 text-white hover:bg-blue-700" title="下載 Markdown 版 (MD)">
-                                    <Icons.Markdown />
-                                </button>
-                                <button onClick={copyResult} className={`p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold ${copyState ? 'bg-emerald-600' : 'bg-slate-800'} text-white`} title="複製 Markdown 內容">
-                                    {copyState ? <Icons.Check /> : <Icons.Clipboard />}
-                                </button>
+                                <button onClick={generateVectorPdf} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-red-600 text-white hover:bg-red-700" title="列印 / 存為 PDF"><Icons.Download /></button>
+                                <button onClick={downloadHtml} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-purple-600 text-white hover:bg-purple-700" title="下載網頁版 (HTML)"><Icons.Code /></button>
+                                <button onClick={downloadMarkdown} className="p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold bg-blue-600 text-white hover:bg-blue-700" title="下載 Markdown 版 (MD)"><Icons.Markdown /></button>
+                                <button onClick={copyResult} className={`p-4 rounded-full shadow-lg transition-all transform hover:scale-110 active:scale-95 flex items-center justify-center font-bold ${copyState ? 'bg-emerald-600' : 'bg-slate-800'} text-white`} title="複製 Markdown 內容">{copyState ? <Icons.Check /> : <Icons.Clipboard />}</button>
                             </div>
                         </div>
                     </div>
@@ -512,7 +387,6 @@
                             </div>
                             <span className="text-xs text-slate-400 font-mono bg-slate-800 px-2 py-1 rounded">多影片批次版</span>
                         </div>
-
                         {appState === 'input' && renderInputScreen()}
                         {appState === 'processing' && renderProcessingScreen()}
                         {appState === 'result' && renderResultScreen()}
@@ -520,7 +394,6 @@
                 </div>
             );
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>

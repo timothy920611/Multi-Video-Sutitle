@@ -147,7 +147,6 @@
                 const lines = inputText.split('\n').map(l => l.trim()).filter(l => l !== '');
                 if (lines.length === 0) return;
                 
-                // 【更新】 提高上限至 200
                 const urlsToProcess = lines.slice(0, 200);
                 
                 const initialResults = urlsToProcess.map(url => ({ url, status: 'pending', id: parseUrlInfo(url).id || '未知ID' }));
@@ -269,28 +268,31 @@
             };
 
             const renderInputScreen = () => (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in print-hidden overflow-y-auto">
-                    <div className="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-xl border border-slate-100 my-auto">
+                <div className="flex-1 flex flex-col items-center p-4 md:p-6 animate-fade-in print-hidden overflow-y-auto">
+                    <div className="w-full max-w-2xl bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-slate-100 my-4 md:my-10">
                         <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><Icons.List /></div>
                                 <div>
                                     <h2 className="text-xl font-bold text-slate-800">批次影片輸入</h2>
-                                    <p className="text-sm text-slate-500">請貼上影片網址，每行一個 (最多 200 個)</p>
+                                    <p className="text-sm text-slate-500">每行一個網址 (最多 200 個)</p>
                                 </div>
                             </div>
                             {inputText.trim().length > 0 && <button onClick={handleClearInput} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><Icons.Trash2 className="w-4 h-4" />清空</button>}
                         </div>
-                        <textarea className="w-full h-64 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none font-mono text-sm whitespace-pre" placeholder="https://www.jw.org/cmn-hant/..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
+                        <textarea 
+                            className="w-full h-48 md:h-64 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none font-mono text-sm whitespace-pre" 
+                            placeholder="https://www.jw.org/cmn-hant/..." 
+                            value={inputText} 
+                            onChange={(e) => setInputText(e.target.value)} 
+                        />
                         <button onClick={handleStartBatch} disabled={!inputText.trim()} className="mt-6 w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Icons.Play className="w-5 h-5 fill-current" />開始批次提取</button>
                         <div className="mt-6 p-5 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-600">
                             <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 text-base"><Icons.Info className="w-5 h-5 text-emerald-600" />使用說明</h3>
                             <ul className="list-disc list-inside space-y-2 ml-1">
-                                <li>請前往 <a href="https://www.jw.org" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">jw.org</a> 尋找您需要的影片。</li>
-                                <li>複製影片網頁的網址並貼入上方文字框。</li>
-                                <li>若要批次處理，請<strong>換行(每行一個連結）</strong>。</li>
-                                <li>支援包含 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">lank</code>, <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">docid</code> 或 <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-mono text-xs">pub</code> 的各種格式。</li>
-                                <li>為確保系統穩定性，單次批次處理上限已提高至 <strong>200</strong> 部影片。</li>
+                                <li>請前往 <a href="https://www.jw.org" target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">jw.org</a> 尋找影片。</li>
+                                <li>複製網頁網址並貼入上方框。</li>
+                                <li>若要批次處理，請<strong>換行</strong>輸入。</li>
                             </ul>
                         </div>
                     </div>
@@ -326,7 +328,7 @@
                         </div>
                         <div className="flex-1 relative bg-white p-4 md:p-8 overflow-y-auto print-visible scroll-smooth-container">
                             <div className="hidden print:block main-title">{getExportName()}</div>
-                            <div className="max-w-4xl mx-auto pb-32 print:pb-0">
+                            <div className="max-w-4xl mx-auto pb-48 print:pb-0">
                                 {successfulItems.length === 0 ? (
                                     <p className="text-slate-500 text-center py-10">沒有成功提取的字幕。請檢查網址是否正確。</p>
                                 ) : (
@@ -363,6 +365,7 @@
                                                 <pre className="w-full font-mono text-xs md:text-sm leading-relaxed text-slate-700 whitespace-pre-wrap break-words">{item.text}</pre>
                                             </div>
                                         ))}
+                                        <div className="h-20 print:hidden"></div>
                                     </>
                                 )}
                             </div>
